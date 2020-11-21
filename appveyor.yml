@@ -1,44 +1,52 @@
-image:
-  # Currently required to support Python 3.9
-  - Visual Studio 2019
 environment:
   MEDIAINFO_VERSION: 20.09
   TWINE_PASSWORD:
     secure: /EO8CxTxhQVNsGNZZvU51jjHwPW524rgddNlwOAyLoA=
   matrix:
-    - PYTHON: "C:/Python36"
-      TOXENV: py36
-    - PYTHON: "C:/Python37"
-      TOXENV: py37
-    - PYTHON: "C:/Python38"
-      TOXENV: py38
-    - PYTHON: "C:/Python39"
-      TOXENV: py39
-    - PYTHON: "C:/Python36-x64"
-      TOXENV: py36
-    - PYTHON: "C:/Python37-x64"
-      TOXENV: py37
-    - PYTHON: "C:/Python38-x64"
-      TOXENV: py38
-    - PYTHON: "C:/Python39-x64"
-      TOXENV: py39
-install:
-    - "SET PATH=%PYTHON%;%PYTHON%/Scripts;%PATH%"
-    - "python --version"
-    - "IF %PYTHON:~-4% == -x64 (SET ARCH=x64) ELSE (SET ARCH=i386)"
-    - ps: "Start-FileDownload https://mediaarea.net/download/binary/mediainfo/${Env:MEDIAINFO_VERSION}/MediaInfo_CLI_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}.zip"
-    - ps: "unzip -o MediaInfo_CLI_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}.zip LIBCURL.DLL"
-    - ps: "Start-FileDownload https://mediaarea.net/download/binary/libmediainfo0/${Env:MEDIAINFO_VERSION}/MediaInfo_DLL_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}_WithoutInstaller.7z"
-    - ps: "7z -y x MediaInfo_DLL_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}_WithoutInstaller.7z MediaInfo.dll Developers/License.html"
-    # Required for tests to pass with tox, Windows looks for DLLs in PATH
-    - ps: "Copy-Item -Path MediaInfo.dll -Destination ${Env:PYTHON}"
-    - "move MediaInfo.dll pymediainfo"
-    - "move Developers\\License.html docs"
-    # TODO: remove the constraint when https://github.com/tox-dev/tox/issues/1550 is fixed
-    - "pip install --upgrade setuptools tox==3.8.3 twine wheel"
-build_script:
-  - "python setup.py bdist_wheel"
-test_script:
-  - "tox"
-deploy_script:
-  - ps: If ($env:APPVEYOR_REPO_TAG -eq "true") { Invoke-Expression "twine upload --skip-existing -u sbraz dist/*.whl" }
+     - TOXENV: py37
+       APPVEYOR_BUILD_WORKER_IMAGE: macos
+     - TOXENV: py38
+       APPVEYOR_BUILD_WORKER_IMAGE: macos
+for:
+-
+  matrix:
+    only:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+  install:
+      - "SET PATH=%PYTHON%;%PYTHON%/Scripts;%PATH%"
+      - "python --version"
+      - "IF %PYTHON:~-4% == -x64 (SET ARCH=x64) ELSE (SET ARCH=i386)"
+      - ps: "Start-FileDownload https://mediaarea.net/download/binary/mediainfo/${Env:MEDIAINFO_VERSION}/MediaInfo_CLI_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}.zip"
+      - ps: "unzip -o MediaInfo_CLI_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}.zip LIBCURL.DLL"
+      - ps: "Start-FileDownload https://mediaarea.net/download/binary/libmediainfo0/${Env:MEDIAINFO_VERSION}/MediaInfo_DLL_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}_WithoutInstaller.7z"
+      - ps: "7z -y x MediaInfo_DLL_${Env:MEDIAINFO_VERSION}_Windows_${Env:ARCH}_WithoutInstaller.7z MediaInfo.dll Developers/License.html"
+      # Required for tests to pass with tox, Windows looks for DLLs in PATH
+      - ps: "Copy-Item -Path MediaInfo.dll -Destination ${Env:PYTHON}"
+      - "move MediaInfo.dll pymediainfo"
+      - "move Developers\\License.html docs"
+      # TODO: remove the constraint when https://github.com/tox-dev/tox/issues/1550 is fixed
+      - "pip install --upgrade setuptools tox==3.8.3 twine wheel"
+  build_script:
+    - "python setup.py bdist_wheel"
+  test_script:
+    - "tox"
+  deploy_script:
+    - ps: If ($env:APPVEYOR_REPO_TAG -eq "true") { Invoke-Expression "twine upload --skip-existing -u sbraz dist/*.whl" }
+-
+  matrix:
+    only:
+      - APPVEYOR_BUILD_WORKER_IMAGE: macos
+  install: |
+    PYTHON_VERSION="$(echo "$TOXENV" | sed 's/.*\(.\)\(.\)$/\1.\2/')"
+    source ~/venv${PYTHON_VERSION}/bin/activate
+    pip install tox wheel
+    curl https://mediaarea.net/download/binary/libmediainfo0/${MEDIAINFO_VERSION}/MediaInfo_DLL_${MEDIAINFO_VERSION}_Mac_i386+x86_64.tar.bz2 \
+      | tar xj MediaInfoLib/libmediainfo.0.dylib MediaInfoLib/License.html
+    cp MediaInfoLib/libmediainfo.0.dylib /usr/local/lib/
+    export APPVEYOR_SSH_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDW+wkqBrLawnfGmn7t/dpHnrrHfhJOjOuHNU6wt1j2ZtKl/cGAFFF8lyIHMg745fusjkMQ0+KnJJztaHycJB/Lb60LzNrX0Me9TSGZslGMF/jb70yGn1f6fgF0QhEUQ4ud7Ama9K8iveljhNgNflwV+081sy8zjQaZzsblxzVCbuRnlzyiIJGqgVROUGMpBOy8jEx3hJt6C5fN1P//Lj6Wn4Ga5G9hREOhXHRObz95igmq5g17x17mmM/o18NeyCd/VyjkATezKNBn91aJMty7F1fm2iXb/bR3W4nHH4W7f3BRo3Ig0CSzGBA5X6qic0A0vm/q+kyiQu2gS1ZtKg5m0YYoaFtF2Nj3Zfz4+xz4y1d73u+LbP7ahfWRgOGOjZXwXOB2U3ECWRK75OCIkWsoJD50MlohyjcCa2NPNrm7IVRdFP/bUxnob6iOojStbtI4+5r+amLA9nFtm5VatPq0y9i6xUDgWvra11mh3cyXqdHz+OglsGpqyfd4x4Uc0uM="
+    #export APPVEYOR_SSH_BLOCK=true
+    curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
+  build_script: |
+    echo $PYTHON_VERSION
+    python setup.py bdist_wheel
+  test_script: "tox"
